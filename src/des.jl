@@ -6,30 +6,11 @@ const EXPANSION_BLOCK_SIZE = 6
 const PC1_KEY_SIZE = 7
 const SUBKEY_SIZE = 6
 
-ByteVector = Vector{UInt8}
-
-function getBit(bytes::ByteVector, bit::Integer)
-    index, bitpos = fldmod(bit, 8)
-    bytes[index + 1] & (0x80 >> bitpos)
-end
-
-function setBit!(bytes::ByteVector, bit::Integer)
-    index, bitpos = fldmod(bit, 8)
-    bytes[index + 1] |= (0x80 >> bitpos)
-end
-
-function clearBit!(bytes::ByteVector, bit::Integer)
-    index, bitpos = fldmod(bit, 8)
-    bytes[index + 1] &= ~(0x80 >> bitpos)
-end
-
-function permute(source::ByteVector, permuteTable::Vector)
-    target = zeros(UInt8, cld(length(permuteTable), 8))
+function permute(source::BitArray, permuteTable::Vector)
+    target = falses(length(permuteTable))
     for i in eachindex(permuteTable)
-        if getBit(source, permuteTable[i]-1) > 0
-            setBit!(target, i-1)
-        else
-            clearBit!(target, i-1)
+        if source[permuteTable[i]]
+            target[i] = true
         end
     end
     return target
