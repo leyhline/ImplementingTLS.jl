@@ -26,4 +26,12 @@ using ImplementingTLS
         des.clearBit!(testbyte, UInt(0))
         @test testbyte[1] == 0b00101010
     end
+    @testset "permute" begin
+        source = ByteVector([0b10101010, 0b10101010, 0b10101010, 0b10101010, 0b10101010, 0b10101010, 0b10101010, 0b10101010])
+        shouldBeTarget = ByteVector([0b00000000, 0b00000000, 0b00000000, 0b00000000, 0b11111111, 0b11111111, 0b11111111, 0b11111111])
+        target = des.permute(source, des.ipTable)
+        @test target == shouldBeTarget
+        backToSource = des.permute(target, des.fpTable)
+        @test backToSource == source
+    end
 end
