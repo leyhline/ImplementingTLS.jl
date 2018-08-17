@@ -1,0 +1,10 @@
+name = "ImplementingTLS"
+uuid = "3ce852e0-a1f8-11e8-0fe9-75d9e10dc6fa"
+authors = ["Thomas Leyh <thomas.leyh@mailbox.org>"]
+version = "0.1.0"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
