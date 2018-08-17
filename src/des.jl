@@ -23,4 +23,9 @@ function clearBit!(bytes::ByteVector, bit::UInt)
     bytes[index + 1] &= ~(0x80 >> bitpos)
 end
 
+function xor(target::ByteVector, source::ByteVector)
+    @assert length(target) == length(source)
+    xor.(target, source)
+end
+
 end
