@@ -10,4 +10,14 @@ using ImplementingTLS
         backToSource = des.permute(target, des.fpTable)
         @test backToSource == source
     end
+    @testset "rotateKey" begin
+        key = BitArray([0,1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,
+                        0,1,0,0,0,1,1,0,0,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1])
+        rotated = BitArray([1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,0,
+                            1,0,0,0,1,1,0,0,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,0])
+        rotateLeft = des.rotateKey(key, -1)
+        @test rotateLeft == rotated
+        rotateBack = des.rotateKey(rotateLeft, 1)
+        @test rotateBack == key
+    end
 end
