@@ -3,7 +3,7 @@ using ImplementingTLS
 
 @testset "des" begin
     @testset "permute" begin
-        source = repeat(BitArray([1,0]), 32)
+        source = repeat(BitVector([1,0]), 32)
         shouldBeTarget = vcat(falses(32), trues(32))
         target = des.permute(source, des.ipTable)
         @test target == shouldBeTarget
@@ -11,13 +11,18 @@ using ImplementingTLS
         @test backToSource == source
     end
     @testset "rotateKey" begin
-        key = BitArray([0,1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,
+        key = BitVector([0,1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,
                         0,1,0,0,0,1,1,0,0,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1])
-        rotated = BitArray([1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,0,
+        rotated = BitVector([1,1,0,0,0,0,1,0,1,1,0,0,0,1,0,0,1,1,0,0,0,1,1,0,1,1,0,0,
                             1,0,0,0,1,1,0,0,1,0,1,0,1,1,0,0,1,1,0,0,1,1,0,0,1,1,1,0])
         rotateLeft = des.rotateKey(key, -1)
         @test rotateLeft == rotated
         rotateBack = des.rotateKey(rotateLeft, 1)
         @test rotateBack == key
+    end
+    @testset "blockOperate" begin
+        plaintext = BitVector(repeat([1], 64))
+        key       = BitVector(repeat([1], 64))
+        des.blockOperate(plaintext, key, des.encrypt)
     end
 end
