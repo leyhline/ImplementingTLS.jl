@@ -3,7 +3,6 @@ module des
 const BLOCKSIZE = 64
 
 function permute(source::BitVector, permuteTable::Vector)
-    @assert length(source) == length(permuteTable)
     target = falses(length(permuteTable))
     for i in eachindex(permuteTable)
         if source[permuteTable[i]]
@@ -71,8 +70,8 @@ function bitsToInt(bits::BitVector)
 end
 
 function intToBits(int)
-    bits = BitVector(undef, 6)
-    for i in 6:-1:1
+    bits = BitVector(undef, 4)
+    for i in 4:-1:1
         int, rem = fldmod(int, 2)
         bits[i] = rem
     end
