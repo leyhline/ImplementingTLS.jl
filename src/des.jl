@@ -109,7 +109,7 @@ function sboxLookup(expansionBlock::BitVector)
     return substitutionBlock
 end
 
-bitVectorToInt(bits::BitVector) = sum(map((i,x) -> x*2^i, length(bits)-1:-1:0, bits))
+bitVectorToInt(bits::BitVector) = sum(map((i,x) -> x ? 2^i : 0, length(bits)-1:-1:0, bits))
 
 function intToBitVector(x, padding)
     bits = BitVector(undef, padding)
