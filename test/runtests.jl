@@ -22,9 +22,22 @@ using ImplementingTLS
     end
     @testset "blockOperate" begin
         plaintext = "hallo du"
-        key       = "abcdefgh"
+        key = "abcdefgh"
         ciphertext = des.blockOperate(plaintext, key, des.encrypt)
         decrypted = des.blockOperate(ciphertext, key, des.decrypt)
         @test decrypted == plaintext
+    end
+    @testset "operate" begin
+        plaintext = "hallo du wie geht es dir"
+        iv = repeat('\0', 8)
+        key = "abcdefgh"
+        @test_throws AssertionError des.operate("hallo du wie geht es", iv, key, des.encrypt, false)
+        ciphertext = des.operate(plaintext, iv, key, des.encrypt, false)
+        decrypted = des.operate(ciphertext, iv, key, des.decrypt, false)
+        @test decrypted == plaintext
+        key3x = "twentyfourcharacterinput"
+        ciphertext3x = des.operate(plaintext, iv, key3x, des.encrypt, true)
+        decrypted3x = des.operate(ciphertext3x, iv, key3x, des.decrypt, true)
+        @test decrypted3x == plaintext
     end
 end

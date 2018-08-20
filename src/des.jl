@@ -5,6 +5,44 @@ const KEYSIZE = 56
 
 @enum Op encrypt decrypt
 
+function operate(input::String, iv::String, key::String, operation::Op, triplicate::Bool)
+    inputVector = stringToBitVector(input)
+    @assert length(inputVector) % BLOCKSIZE == 0
+    ivVector = stringToBitVector(iv)
+    @assert length(ivVector) == BLOCKSIZE
+    keyVector = stringToBitVector(key)
+    @assert length(keyVector) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
+    output = BitVector(undef, length(inputVector))
+    for i in 1:BLOCKSIZE:length(inputVector)
+        inputBlock = inputVector[i:i+BLOCKSIZE-1]
+        if operation == encrypt
+            inputBlock .⊻= ivVector
+            if triplicate
+                outputBlock = blockOperate(inputBlock, keyVector[1:BLOCKSIZE], encrypt)
+                outputBlock = blockOperate(outputBlock, keyVector[BLOCKSIZE+1:2BLOCKSIZE], decrypt)
+                outputBlock = blockOperate(outputBlock, keyVector[2BLOCKSIZE+1:3BLOCKSIZE], encrypt)
+            else
+                outputBlock = blockOperate(inputBlock, keyVector, encrypt)
+            end
+            ivVector = outputBlock
+            output[i:i+BLOCKSIZE-1] = outputBlock
+        end
+        if operation == decrypt
+            if triplicate
+                outputBlock = blockOperate(inputBlock, keyVector[2BLOCKSIZE+1:3BLOCKSIZE], decrypt)
+                outputBlock = blockOperate(outputBlock, keyVector[BLOCKSIZE+1:2BLOCKSIZE], encrypt)
+                outputBlock = blockOperate(outputBlock, keyVector[1:BLOCKSIZE], decrypt)
+            else
+                outputBlock = blockOperate(inputBlock, keyVector, decrypt)
+            end
+            outputBlock .⊻= ivVector
+            ivVector = inputBlock
+            output[i:i+BLOCKSIZE-1] = outputBlock
+        end
+    end
+    bitVectorToString(output)
+end
+
 function blockOperate(plaintext::String, key::String, operation::Op)
     plaintextVector = stringToBitVector(plaintext)
     keyVector = stringToBitVector(key)
@@ -71,9 +109,7 @@ function sboxLookup(expansionBlock::BitVector)
     return substitutionBlock
 end
 
-function bitVectorToInt(bits::BitVector)
-    sum(map((i,x) -> x*2^i, length(bits)-1:-1:0, bits))
-end
+bitVectorToInt(bits::BitVector) = sum(map((i,x) -> x*2^i, length(bits)-1:-1:0, bits))
 
 function intToBitVector(int, outputLength)
     bits = BitVector(undef, outputLength)
