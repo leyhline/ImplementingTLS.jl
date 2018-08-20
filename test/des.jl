@@ -1,6 +1,13 @@
 using Test
 using ImplementingTLS
 
+@testset "intToBitVector" begin
+    allFalse = des.intToBitVector(0, 8)
+    @test falses(8) == allFalse
+    allTrue = des.intToBitVector(255, 8)
+    @test trues(8) == allTrue
+end
+
 @testset "permute" begin
     source = repeat(BitVector([1,0]), 32)
     shouldBeTarget = vcat(falses(32), trues(32))

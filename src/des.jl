@@ -111,11 +111,11 @@ end
 
 bitVectorToInt(bits::BitVector) = sum(map((i,x) -> x*2^i, length(bits)-1:-1:0, bits))
 
-function intToBitVector(int, outputLength)
-    bits = BitVector(undef, outputLength)
-    for i in outputLength:-1:1
-        int, rem = fldmod(int, 2)
-        bits[i] = rem
+function intToBitVector(x, padding)
+    bits = BitVector(undef, padding)
+    for i in padding:-1:1
+        bits[i] = x & 0x1
+        x >>= 1
     end
     return bits
 end
