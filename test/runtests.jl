@@ -21,8 +21,10 @@ using ImplementingTLS
         @test rotateBack == key
     end
     @testset "blockOperate" begin
-        plaintext = BitVector(repeat([1], 64))
-        key       = BitVector(repeat([1], 64))
-        des.blockOperate(plaintext, key, des.encrypt)
+        plaintext = "hallo du"
+        key       = "abcdefgh"
+        ciphertext = des.blockOperate(plaintext, key, des.encrypt)
+        decrypted = des.blockOperate(ciphertext, key, des.decrypt)
+        @test decrypted == plaintext
     end
 end

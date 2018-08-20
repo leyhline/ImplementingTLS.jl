@@ -1,6 +1,48 @@
 module des
 
 const BLOCKSIZE = 64
+const KEYSIZE = 56
+
+@enum Op encrypt decrypt
+
+function blockOperate(plaintext::String, key::String, operation::Op)
+    plaintextVector = stringToBitVector(plaintext)
+    keyVector = stringToBitVector(key)
+    ciphertext = blockOperate(plaintextVector, keyVector, operation)
+    bitVectorToString(ciphertext)
+end
+
+stringToBitVector(inputString::String) = vcat(map(intToBitVector, transcode(UInt8, inputString), Iterators.cycle(8))...)
+bitVectorToString(bits::BitVector) = transcode(String, map(UInt8, vec(mapslices(des.bitVectorToInt, reshape(bits, 8, length(bits)÷8), dims=1))))
+
+function blockOperate(plaintext::BitVector, key::BitVector, operation::Op)
+    @assert length(plaintext) == BLOCKSIZE
+    ipBlock = permute(plaintext, ipTable)
+    pc1Key = permute(key, pc1Table)
+    for round in 1:16
+        expansionBlock = permute(ipBlock[BLOCKSIZE÷2+1:end], expansionTable)
+        if operation == encrypt
+            pc1Key = rol(pc1Key)
+            if !(round in [1, 2, 9, 16])
+                pc1Key = rol(pc1Key)
+            end
+        end
+        subkey = permute(pc1Key, pc2Table)
+        if operation == decrypt
+            pc1Key = ror(pc1Key)
+            if !(round in [16, 15, 8, 1])
+                pc1Key = ror(pc1Key)
+            end
+        end
+        expansionBlock .⊻= subkey
+        substitutionBlock = sboxLookup(expansionBlock)
+        pboxTarget = permute(substitutionBlock, pTable)
+        ipBlock[1:BLOCKSIZE÷2] .⊻= pboxTarget
+        ipBlock = circshift(ipBlock, BLOCKSIZE÷2)
+    end
+    ipBlock = circshift(ipBlock, BLOCKSIZE÷2)
+    permute(ipBlock, fpTable)
+end
 
 function permute(source::BitVector, permuteTable::Vector)
     target = falses(length(permuteTable))
@@ -12,66 +54,30 @@ function permute(source::BitVector, permuteTable::Vector)
     return target
 end
 
-function rotateKey(key::BitVector, shift::Integer)
-    @assert length(key) == 56
-    halfes = reshape(key, 28, 2)
-    reshape(circshift(halfes, shift), 56)
-end
-
 rol(key::BitVector) = rotateKey(key, -1)
 ror(key::BitVector) = rotateKey(key, 1)
-
-@enum Op encrypt decrypt
-
-function blockOperate(plaintext::BitVector, key::BitVector, operation::Op)
-    @assert length(plaintext) == BLOCKSIZE
-    ipBlock = permute(plaintext, ipTable)
-    pc1Key = permute(key, pc1Table)
-    for round in 1:16
-        expansionBlock = permute(ipBlock[33:end], expansionTable)
-        if operation == encrypt
-            pc1Key = rol(pc1Key)
-            if round in [3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15]
-                pc1Key = rol(pc1Key)
-            end
-        end
-        subkey = permute(pc1Key, pc2Table)
-        if operation == decrypt
-            pc1Key = ror(pc1Key)
-            if round in [14, 13, 12, 11, 10, 9, 7, 6, 5, 4, 3, 2]
-                pc1Key = ror(pc1Key)
-            end
-        end
-        expansionBlock .⊻= subkey
-        substitutionBlock = sboxLookup(expansionBlock)
-        pboxTarget = permute(substitutionBlock, pTable)
-        recombBox = ipBlock[1:32]
-        ipBlock[1:32] = ipBlock[33:64]
-        recombBox .⊻= pboxTarget
-        ipBlock[33:64] = recombBox
-    end
-    recombBox = ipBlock[1:32]
-    ipBlock[1:32] = ipBlock[33:64]
-    ipBlock[33:64] = recombBox
-    permute(ipBlock, fpTable)
+function rotateKey(key::BitVector, shift::Integer)
+    @assert length(key) == KEYSIZE
+    halfes = reshape(key, KEYSIZE÷2, 2)
+    reshape(circshift(halfes, shift), KEYSIZE)
 end
 
 function sboxLookup(expansionBlock::BitVector)
-    substitutionBlock = BitVector(undef, BLOCKSIZE ÷ 2)
-    for x in 1:8
-        y = bitsToInt(expansionBlock[6(x-1)+1:6x]) + 1
-        substitutionBlock[4(x-1)+1:4x] = intToBits(sbox[x,y])
+    substitutionBlock = BitVector(undef, BLOCKSIZE÷2)
+    for x in 1:size(sbox, 1)
+        y = bitVectorToInt(expansionBlock[6(x-1)+1:6x]) + 1
+        substitutionBlock[4(x-1)+1:4x] = intToBitVector(sbox[x,y], 4)
     end
     return substitutionBlock
 end
 
-function bitsToInt(bits::BitVector)
+function bitVectorToInt(bits::BitVector)
     sum(map((i,x) -> x*2^i, length(bits)-1:-1:0, bits))
 end
 
-function intToBits(int)
-    bits = BitVector(undef, 4)
-    for i in 4:-1:1
+function intToBitVector(int, outputLength)
+    bits = BitVector(undef, outputLength)
+    for i in outputLength:-1:1
         int, rem = fldmod(int, 2)
         bits[i] = rem
     end
