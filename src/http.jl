@@ -5,15 +5,25 @@ using Sockets
 const HTTPPORT = 80
 
 function main()
-    host, path = parseUrl("http://www.google.com/")
+    if length(ARGS) != 1
+        println("Usage: $PROGRAM_FILE url")
+        exit(1)
+    end
+    url = ARGS[1]
+    println("Connecting to: $url on $HTTPPORT")
+    host, path = parseUrl(url)
     hostName = getaddrinfo(host, IPv4)
     println("Corresponding IP address: $hostName")
     connection = connect(hostName, HTTPPORT)
-    println("Retrieving document: '$path'")
-    httpGet(connection, String(path), String(host))
-    received = String(read(connection))
-    println(received)
-    println("Shutting down.")
+    try
+        httpGet(connection, String(path), String(host))
+        println("Retrieving document: '$path'")
+        response = read(connection)
+        print(String(response))
+    finally
+        println("Shutting down.")
+        close(connection)
+    end
 end
 
 function parseUrl(uri::String)
@@ -22,9 +32,14 @@ function parseUrl(uri::String)
 end
 
 function httpGet(connection, path::String, host::String)
-    write(connection, "GET /$path HTTP/1.1\r\n")
-    write(connection, "Host: $host\r\n")
-    write(connection, "Connection: close\r\n\r\n")
+    write(connection,
+        "GET /$path HTTP/1.1\r\n" *
+        "Host: $host\r\n" *
+        "Connection: close\r\n\r\n")
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
 end
 
 end
