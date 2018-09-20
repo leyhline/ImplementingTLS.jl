@@ -11,9 +11,9 @@ end
 @testset "permute" begin
     source = repeat(BitVector([1,0]), 32)
     shouldbe_target = vcat(falses(32), trues(32))
-    target = des.permute(source, des.iptable)
+    target = des.permute(source, des.IP_TABLE)
     @test target == shouldbe_target
-    back_to_source = des.permute(target, des.fptable)
+    back_to_source = des.permute(target, des.FP_TABLE)
     @test back_to_source == source
 end
 
