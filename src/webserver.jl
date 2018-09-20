@@ -2,21 +2,21 @@ module webserver
 
 using Sockets
 
-const HTTPPORT = 80
-const LOOPBACKADDR = ip"127.0.0.1"
+const HTTP_PORT = 80
+const LOOPBACK_ADDR = ip"127.0.0.1"
 const BACKLOG = 5
 
 function main()
-    server = listen(LOOPBACKADDR, HTTPPORT, backlog=BACKLOG)
+    server = listen(LOOPBACK_ADDR, HTTP_PORT, backlog=BACKLOG)
     while true
         connection = accept(server)
         name, port = getpeername(connection)
         println("Connected with: $name on $port")
-        handleRequest(connection)
+        handle_request(connection)
     end
 end
 
-function handleRequest(connection)
+function handle_request(connection)
     while isopen(connection)
         request = readline(connection, keep=true)
         print(request)

@@ -6,112 +6,112 @@ const KEYSIZE = 56
 @enum Op encrypt decrypt
 
 function operate(input::String, iv::String, key::String, operation::Op, triplicate::Bool)
-    inputVector = stringToBitVector(input)
-    @assert length(inputVector) % BLOCKSIZE == 0
-    ivVector = stringToBitVector(iv)
-    @assert length(ivVector) == BLOCKSIZE
-    keyVector = stringToBitVector(key)
-    @assert length(keyVector) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
-    output = BitVector(undef, length(inputVector))
-    for i in 1:BLOCKSIZE:length(inputVector)
-        inputBlock = inputVector[i:i+BLOCKSIZE-1]
+    inputvector = string_to_bitvector(input)
+    @assert length(inputvector) % BLOCKSIZE == 0
+    ivvector = string_to_bitvector(iv)
+    @assert length(ivvector) == BLOCKSIZE
+    keyvector = string_to_bitvector(key)
+    @assert length(keyvector) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
+    output = BitVector(undef, length(inputvector))
+    for i in 1:BLOCKSIZE:length(inputvector)
+        inputblock = inputvector[i:i+BLOCKSIZE-1]
         if operation == encrypt
-            inputBlock .⊻= ivVector
+            inputblock .⊻= ivvector
             if triplicate
-                outputBlock = blockOperate(inputBlock, keyVector[1:BLOCKSIZE], encrypt)
-                outputBlock = blockOperate(outputBlock, keyVector[BLOCKSIZE+1:2BLOCKSIZE], decrypt)
-                outputBlock = blockOperate(outputBlock, keyVector[2BLOCKSIZE+1:3BLOCKSIZE], encrypt)
+                outputblock = blockoperate(inputblock, keyvector[1:BLOCKSIZE], encrypt)
+                outputblock = blockoperate(outputblock, keyvector[BLOCKSIZE+1:2BLOCKSIZE], decrypt)
+                outputblock = blockoperate(outputblock, keyvector[2BLOCKSIZE+1:3BLOCKSIZE], encrypt)
             else
-                outputBlock = blockOperate(inputBlock, keyVector, encrypt)
+                outputblock = blockoperate(inputblock, keyvector, encrypt)
             end
-            ivVector = outputBlock
-            output[i:i+BLOCKSIZE-1] = outputBlock
+            ivvector = outputblock
+            output[i:i+BLOCKSIZE-1] = outputblock
         end
         if operation == decrypt
             if triplicate
-                outputBlock = blockOperate(inputBlock, keyVector[2BLOCKSIZE+1:3BLOCKSIZE], decrypt)
-                outputBlock = blockOperate(outputBlock, keyVector[BLOCKSIZE+1:2BLOCKSIZE], encrypt)
-                outputBlock = blockOperate(outputBlock, keyVector[1:BLOCKSIZE], decrypt)
+                outputblock = blockoperate(inputblock, keyvector[2BLOCKSIZE+1:3BLOCKSIZE], decrypt)
+                outputblock = blockoperate(outputblock, keyvector[BLOCKSIZE+1:2BLOCKSIZE], encrypt)
+                outputblock = blockoperate(outputblock, keyvector[1:BLOCKSIZE], decrypt)
             else
-                outputBlock = blockOperate(inputBlock, keyVector, decrypt)
+                outputblock = blockoperate(inputblock, keyvector, decrypt)
             end
-            outputBlock .⊻= ivVector
-            ivVector = inputBlock
-            output[i:i+BLOCKSIZE-1] = outputBlock
+            outputblock .⊻= ivvector
+            ivvector = inputblock
+            output[i:i+BLOCKSIZE-1] = outputblock
         end
     end
-    bitVectorToString(output)
+    bitvector_to_string(output)
 end
 
-function blockOperate(plaintext::String, key::String, operation::Op)
-    plaintextVector = stringToBitVector(plaintext)
-    keyVector = stringToBitVector(key)
-    ciphertext = blockOperate(plaintextVector, keyVector, operation)
-    bitVectorToString(ciphertext)
+function blockoperate(plaintext::String, key::String, operation::Op)
+    plaintextvector = string_to_bitvector(plaintext)
+    keyvector = string_to_bitvector(key)
+    ciphertext = blockoperate(plaintextvector, keyvector, operation)
+    bitvector_to_string(ciphertext)
 end
 
-stringToBitVector(inputString::String) = vcat(map(intToBitVector, transcode(UInt8, inputString), Iterators.cycle(8))...)
-bitVectorToString(bits::BitVector) = transcode(String, map(UInt8, vec(mapslices(des.bitVectorToInt, reshape(bits, 8, length(bits)÷8), dims=1))))
+string_to_bitvector(input::String) = vcat(map(int_to_bitvector, transcode(UInt8, input), Iterators.cycle(8))...)
+bitvector_to_string(bits::BitVector) = transcode(String, map(UInt8, vec(mapslices(des.bitvector_to_int, reshape(bits, 8, length(bits)÷8), dims=1))))
 
-function blockOperate(plaintext::BitVector, key::BitVector, operation::Op)
+function blockoperate(plaintext::BitVector, key::BitVector, operation::Op)
     @assert length(plaintext) == BLOCKSIZE
-    ipBlock = permute(plaintext, ipTable)
-    pc1Key = permute(key, pc1Table)
+    ipblock = permute(plaintext, iptable)
+    pc1key = permute(key, pc1table)
     for round in 1:16
-        expansionBlock = permute(ipBlock[BLOCKSIZE÷2+1:end], expansionTable)
+        expansionblock = permute(ipblock[BLOCKSIZE÷2+1:end], expansiontable)
         if operation == encrypt
-            pc1Key = rol(pc1Key)
+            pc1key = rol(pc1key)
             if !(round in [1, 2, 9, 16])
-                pc1Key = rol(pc1Key)
+                pc1key = rol(pc1key)
             end
         end
-        subkey = permute(pc1Key, pc2Table)
+        subkey = permute(pc1key, pc2table)
         if operation == decrypt
-            pc1Key = ror(pc1Key)
+            pc1key = ror(pc1key)
             if !(round in [16, 15, 8, 1])
-                pc1Key = ror(pc1Key)
+                pc1key = ror(pc1key)
             end
         end
-        expansionBlock .⊻= subkey
-        substitutionBlock = sboxLookup(expansionBlock)
-        pboxTarget = permute(substitutionBlock, pTable)
-        ipBlock[1:BLOCKSIZE÷2] .⊻= pboxTarget
-        ipBlock = circshift(ipBlock, BLOCKSIZE÷2)
+        expansionblock .⊻= subkey
+        substitutionblock = sboxlookup(expansionblock)
+        pboxtarget = permute(substitutionblock, ptable)
+        ipblock[1:BLOCKSIZE÷2] .⊻= pboxtarget
+        ipblock = circshift(ipblock, BLOCKSIZE÷2)
     end
-    ipBlock = circshift(ipBlock, BLOCKSIZE÷2)
-    permute(ipBlock, fpTable)
+    ipblock = circshift(ipblock, BLOCKSIZE÷2)
+    permute(ipblock, fptable)
 end
 
-function permute(source::BitVector, permuteTable::Vector)
-    target = falses(length(permuteTable))
-    for i in eachindex(permuteTable)
-        if source[permuteTable[i]]
+function permute(source::BitVector, permutetable::Vector)
+    target = falses(length(permutetable))
+    for i in eachindex(permutetable)
+        if source[permutetable[i]]
             target[i] = true
         end
     end
     return target
 end
 
-rol(key::BitVector) = rotateKey(key, -1)
-ror(key::BitVector) = rotateKey(key, 1)
-function rotateKey(key::BitVector, shift::Integer)
+rol(key::BitVector) = rotatekey(key, -1)
+ror(key::BitVector) = rotatekey(key, 1)
+function rotatekey(key::BitVector, shift::Integer)
     @assert length(key) == KEYSIZE
     halfes = reshape(key, KEYSIZE÷2, 2)
     reshape(circshift(halfes, shift), KEYSIZE)
 end
 
-function sboxLookup(expansionBlock::BitVector)
-    substitutionBlock = BitVector(undef, BLOCKSIZE÷2)
+function sboxlookup(expansionblock::BitVector)
+    substitutionblock = BitVector(undef, BLOCKSIZE÷2)
     for x in 1:size(sbox, 1)
-        y = bitVectorToInt(expansionBlock[6(x-1)+1:6x]) + 1
-        substitutionBlock[4(x-1)+1:4x] = intToBitVector(sbox[x,y], 4)
+        y = bitvector_to_int(expansionblock[6(x-1)+1:6x]) + 1
+        substitutionblock[4(x-1)+1:4x] = int_to_bitvector(sbox[x,y], 4)
     end
-    return substitutionBlock
+    return substitutionblock
 end
 
-bitVectorToInt(bits::BitVector) = sum(map((i,x) -> x ? 2^i : 0, length(bits)-1:-1:0, bits))
+bitvector_to_int(bits::BitVector) = sum(map((i,x) -> x ? 2^i : 0, length(bits)-1:-1:0, bits))
 
-function intToBitVector(x, padding)
+function int_to_bitvector(x, padding)
     bits = BitVector(undef, padding)
     for i in padding:-1:1
         bits[i] = x & 0x1
@@ -120,7 +120,7 @@ function intToBitVector(x, padding)
     return bits
 end
 
-const ipTable = [  # Initial permutation
+const iptable = [  # Initial permutation
     58, 50, 42, 34, 26, 18, 10, 2,
     60, 52, 44, 36, 28, 20, 12, 4,
     62, 54, 46, 38, 30, 22, 14, 6,
@@ -130,7 +130,7 @@ const ipTable = [  # Initial permutation
     61, 53, 45, 37, 29, 21, 13, 5,
     63, 55, 47, 39, 31, 23, 15, 7
 ]
-const fpTable = [  # Final permutation
+const fptable = [  # Final permutation
     40, 8, 48, 16, 56, 24, 64, 32,
     39, 7, 47, 15, 55, 23, 63, 31,
     38, 6, 46, 14, 54, 22, 62, 30,
@@ -140,7 +140,7 @@ const fpTable = [  # Final permutation
     34, 2, 42, 10, 50, 18, 58, 26,
     33, 1, 41, 9, 49, 17, 57, 25
 ]
-const pc1Table = [
+const pc1table = [
     57, 49, 41, 33, 25, 17, 9, 1,
     58, 50, 42, 34, 26, 18, 10, 2,
     59, 51, 43, 35, 27, 19, 11, 3,
@@ -150,7 +150,7 @@ const pc1Table = [
     61, 53, 45, 37, 29, 21, 13, 5,
     28, 20, 12, 4
 ]
-const pc2Table = [
+const pc2table = [
     14, 17, 11, 24, 1, 5,
     3, 28, 15, 6, 21, 10,
     23, 19, 12, 4, 26, 8,
@@ -160,7 +160,7 @@ const pc2Table = [
     44, 49, 39, 56, 34, 53,
     46, 42, 50, 36, 29, 32
 ]
-const expansionTable = [
+const expansiontable = [
     32, 1, 2, 3, 4, 5,
     4, 5, 6, 7, 8, 9,
     8, 9, 10, 11, 12, 13,
@@ -180,7 +180,7 @@ const sbox = [
     4 13 11 0 2 11 14 7 15 4 0 9 8 1 13 10 3 14 12 3 9 5 7 12 5 2 10 15 6 8 1 6 1 6 4 11 11 13 13 8 12 1 3 4 7 10 14 7 10 9 15 5 6 0 8 15 0 14 5 2 9 3 2 12
     13 1 2 15 8 13 4 8 6 10 15 3 11 7 1 4 10 12 9 5 3 6 14 11 5 0 0 14 12 9 7 2 7 2 11 1 4 14 1 7 9 4 12 10 14 8 2 13 0 15 6 12 10 9 13 0 15 3 3 5 5 6 8 11
 ]
-const pTable = [
+const ptable = [
     16, 7, 20, 21,
     29, 12, 28, 17,
     1, 15, 23, 26,
