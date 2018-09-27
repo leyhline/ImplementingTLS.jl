@@ -1,8 +1,9 @@
 module ImplementingTLS
 
-export des
+export des, aes
 
 include("utils.jl")
 include("des.jl")
+include("aes.jl")
 
 end

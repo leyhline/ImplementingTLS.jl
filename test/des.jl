@@ -1,4 +1,3 @@
-using Test
 using ImplementingTLS
 
 @testset "int_to_bitvector" begin
