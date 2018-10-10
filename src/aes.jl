@@ -5,17 +5,51 @@ using ..utils
 const WORDSIZE = 32
 const BYTESIZE = 8
 
+function blockencrypt(input::String, key::String)
+    inputvector = string_to_bitvector(input)
+    keyvector = string_to_bitvector(key)
+    blockencrypt(inputvector, keyvector)
+end
+
+function blockencrypt(input::BitVector, key::BitVector)
+    state = reshape(input, WORDSIZE, 4)
+    nr_rounds = length(key) ÷ WORDSIZE + 6
+    key_schedule = compute_key_schedule(key)
+end
+
+function compute_key_schedule(key::BitVector)
+    rcon = BitVector([0, 0, 0, 0, 0, 0, 0, 1])
+    nr_keywords = length(key) ÷ WORDSIZE
+    key_schedule = BitArray(undef, WORDSIZE, 4(nr_keywords + 7))
+    # First, simply copy the key into the schedule.
+    key_schedule[:,1:nr_keywords] = reshape(key, WORDSIZE, nr_keywords)
+    # Next, we iteratively calculate the remaining schedule.
+    for i in nr_keywords+1:size(key_schedule, 2)
+        key_schedule[:,i] = key_schedule[:,i-1]
+        if i % nr_keywords == 0
+            key_schedule[:,i] = rotate_word(key_schedule[:,i])
+            key_schedule[:,i] = sub_word(key_schedule[:,i])
+            if i % 36 == 0
+                rcon = BitVector([0, 0, 0, 1, 1, 0, 1, 1])
+            end
+            key_schedule[1:BYTESIZE,i] .⊻= rcon
+            rcon <<= 1
+        elseif (nr_keywords > 6) && (i % nr_keywords == 4)
+            key_schedule[:,i] = sub_word(key_schedule[:,i])
+        end
+        key_schedule[:,i] .⊻= key_schedule[:,i-nr_keywords]
+    end
+    return key_schedule
+end
+
 function rotate_word(word::BitVector)
     @assert length(word) == WORDSIZE
     circshift(word, -BYTESIZE)
 end
 
-function sub_word!(word::BitVector)
+function sub_word(word::BitVector) # TODO Use map instead of for loop
     @assert length(word) == WORDSIZE
-    copied_word = copy(word)
-    for i in 1:BYTESIZE:WORDSIZE
-        word[i:i+BYTESIZE-1] = sub_byte(word[i:i+BYTESIZE-1])
-    end
+    mapslices(sub_byte, reshape(word, BYTESIZE, :), dims = 1)[:]
 end
 
 function sub_byte(byte::BitVector)
