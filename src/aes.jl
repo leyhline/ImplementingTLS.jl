@@ -15,6 +15,25 @@ function blockencrypt(input::BitVector, key::BitVector)
     state = reshape(input, WORDSIZE, 4)
     nr_rounds = length(key) ÷ WORDSIZE + 6
     key_schedule = compute_key_schedule(key)
+    state .⊻= key_schedule[:,1:4]
+    for round in 1:nr_rounds
+        state = sub_words(state)
+        shift_rows(state)
+        if round < nr_rounds
+            #mix_columns!(state)
+        end
+        state .⊻= key_schedule[:,4round+1:4round+4]
+    end
+end
+
+function shift_rows(state::BitArray)
+    @assert size(state) == (WORDSIZE, 4)
+    new_state = similar(state)
+    new_state[1:BYTESIZE,:] = state[1:BYTESIZE,:]
+    new_state[1BYTESIZE+1:2BYTESIZE,:] = circshift(state[1BYTESIZE+1:2BYTESIZE,:], (0, 1))
+    new_state[2BYTESIZE+1:3BYTESIZE,:] = circshift(state[2BYTESIZE+1:3BYTESIZE,:], (0, 2))
+    new_state[3BYTESIZE+1:4BYTESIZE,:] = circshift(state[3BYTESIZE+1:4BYTESIZE,:], (0, 3))
+    return new_state
 end
 
 function compute_key_schedule(key::BitVector)
@@ -47,7 +66,12 @@ function rotate_word(word::BitVector)
     circshift(word, -BYTESIZE)
 end
 
-function sub_word(word::BitVector) # TODO Use map instead of for loop
+function sub_words(words::BitArray)
+    @assert size(words, 1) == WORDSIZE
+    mapslices(sub_word, words, dims = 1)
+end
+
+function sub_word(word::BitVector)
     @assert length(word) == WORDSIZE
     mapslices(sub_byte, reshape(word, BYTESIZE, :), dims = 1)[:]
 end

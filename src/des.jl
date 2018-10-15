@@ -14,7 +14,7 @@ function operate(input::String, iv::String, key::String, operation::Op, triplica
     @assert length(ivvector) == BLOCKSIZE
     keyvector = string_to_bitvector(key)
     @assert length(keyvector) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
-    output = BitVector(undef, length(inputvector))
+    output = similar(inputvector)
     for i in 1:BLOCKSIZE:length(inputvector)
         inputblock = inputvector[i:i+BLOCKSIZE-1]
         if operation == encrypt
