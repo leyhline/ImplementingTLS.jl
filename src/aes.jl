@@ -2,13 +2,63 @@ module aes
 
 using ..utils
 
+const BLOCKSIZE = 128
+const KEYSIZES = [128, 192, 256]
 const WORDSIZE = 32
 const BYTESIZE = 8
+const OVERFLOW_BYTE = BitVector([0, 0, 0, 1, 1, 0, 1, 1])
+
+function encrypt(input::String, iv::String, key::String)
+    inputvector = string_to_bitvector(input)
+    ivvector = string_to_bitvector(iv)
+    keyvector = string_to_bitvector(key)
+    cyphertext = encrypt(inputvector, ivvector, keyvector)
+    bitvector_to_string(cyphertext)
+end
+
+function encrypt(input::BitVector, iv::BitVector, key::BitVector)
+    @assert length(input) % BLOCKSIZE == 0
+    @assert length(iv) == BLOCKSIZE
+    @assert length(key) in KEYSIZES
+    output = similar(input)
+    for i in 1:BLOCKSIZE:length(input)
+        inputblock = input[i:i+BLOCKSIZE-1]
+        inputblock .⊻= iv
+        outputblock = blockencrypt(inputblock, key)
+        iv = outputblock
+        output[i:i+BLOCKSIZE-1] = outputblock
+    end
+    return output
+end
+
+function decrypt(input::String, iv::String, key::String)
+    inputvector = string_to_bitvector(input)
+    ivvector = string_to_bitvector(iv)
+    keyvector = string_to_bitvector(key)
+    cleartext = decrypt(inputvector, ivvector, keyvector)
+    bitvector_to_string(cleartext)
+end
+
+function decrypt(input::BitVector, iv::BitVector, key::BitVector)
+    @assert length(input) % BLOCKSIZE == 0
+    @assert length(iv) == BLOCKSIZE
+    @assert length(key) in KEYSIZES
+    output = similar(input)
+    for i in 1:BLOCKSIZE:length(input)
+        inputblock = input[i:i+BLOCKSIZE-1]
+        outputblock = blockdecrypt(inputblock, key)
+        outputblock .⊻= iv
+        iv = inputblock
+        output[i:i+BLOCKSIZE-1] = outputblock
+    end
+    return output
+end
 
 function blockencrypt(input::String, key::String)
     inputvector = string_to_bitvector(input)
     keyvector = string_to_bitvector(key)
-    blockencrypt(inputvector, keyvector)
+    ciphertext = blockencrypt(inputvector, keyvector)
+    bitvector_to_string(ciphertext)
 end
 
 function blockencrypt(input::BitVector, key::BitVector)
@@ -18,12 +68,36 @@ function blockencrypt(input::BitVector, key::BitVector)
     state .⊻= key_schedule[:,1:4]
     for round in 1:nr_rounds
         state = sub_words(state)
-        shift_rows(state)
+        state = shift_rows(state)
         if round < nr_rounds
-            #mix_columns!(state)
+            state = mix_columns(state)
         end
         state .⊻= key_schedule[:,4round+1:4round+4]
     end
+    return state[:]
+end
+
+function blockdecrypt(input::String, key::String)
+    inputvector = string_to_bitvector(input)
+    keyvector = string_to_bitvector(key)
+    cleartext = blockdecrypt(inputvector, keyvector)
+    bitvector_to_string(cleartext)
+end
+
+function blockdecrypt(input::BitVector, key::BitVector)
+    state = reshape(input, WORDSIZE, 4)
+    nr_rounds = length(key) ÷ WORDSIZE + 6
+    key_schedule = compute_key_schedule(key)
+    state .⊻= key_schedule[:,4nr_rounds+1:4nr_rounds+4]
+    for round in nr_rounds:-1:1
+        state = shift_rows_inv(state)
+        state = sub_words_inv(state)
+        state .⊻= key_schedule[:,4(round-1)+1:4(round-1)+4]
+        if round > 1
+            state = mix_columns_inv(state)
+        end
+    end
+    return state[:]
 end
 
 function shift_rows(state::BitArray)
@@ -34,6 +108,54 @@ function shift_rows(state::BitArray)
     new_state[2BYTESIZE+1:3BYTESIZE,:] = circshift(state[2BYTESIZE+1:3BYTESIZE,:], (0, 2))
     new_state[3BYTESIZE+1:4BYTESIZE,:] = circshift(state[3BYTESIZE+1:4BYTESIZE,:], (0, 3))
     return new_state
+end
+
+function shift_rows_inv(state::BitArray)
+    @assert size(state) == (WORDSIZE, 4)
+    new_state = similar(state)
+    new_state[1:BYTESIZE,:] = state[1:BYTESIZE,:]
+    new_state[1BYTESIZE+1:2BYTESIZE,:] = circshift(state[1BYTESIZE+1:2BYTESIZE,:], (0, -1))
+    new_state[2BYTESIZE+1:3BYTESIZE,:] = circshift(state[2BYTESIZE+1:3BYTESIZE,:], (0, -2))
+    new_state[3BYTESIZE+1:4BYTESIZE,:] = circshift(state[3BYTESIZE+1:4BYTESIZE,:], (0, -3))
+    return new_state
+end
+
+mix_columns(state::BitArray) = mapslices(mix_column, state, dims = 1)
+mix_columns_inv(state::BitArray) = mapslices(mix_column_inv, state, dims = 1)
+
+mix_column(column::BitVector) = mix_column(column, MIX)
+mix_column_inv(column::BitVector) = mix_column(column, MIX_INV)
+function mix_column(column::BitVector, mix_matrix::Array{UInt8})
+    byte_column = reshape(column, BYTESIZE, 4)
+    mixed_column = falses(BYTESIZE, 4)
+    for j in 1:4
+        for i in 1:4
+            mixed_column[:,j] .⊻= dot(int_to_bitvector(mix_matrix[i,j], BYTESIZE), byte_column[:,i])
+        end
+    end
+    return mixed_column[:]
+end
+
+function dot(x::BitVector, y::BitVector)
+    @assert length(x)== BYTESIZE
+    @assert length(y) == BYTESIZE
+    product = falses(BYTESIZE)
+    for mask in [BitVector([0, 0, 0, 0, 0, 0, 0, 1]) << i for i in 0:7]
+        if any(y .& mask)
+            product .⊻= x
+        end
+        x = xtime(x)
+    end
+    return product
+end
+
+function xtime(x::BitVector)
+    @assert length(x) == BYTESIZE
+    if x[1]
+        return (x << 1) .⊻ OVERFLOW_BYTE
+    else
+        return (x << 1)
+    end
 end
 
 function compute_key_schedule(key::BitVector)
@@ -49,7 +171,7 @@ function compute_key_schedule(key::BitVector)
             key_schedule[:,i] = rotate_word(key_schedule[:,i])
             key_schedule[:,i] = sub_word(key_schedule[:,i])
             if i % 36 == 0
-                rcon = BitVector([0, 0, 0, 1, 1, 0, 1, 1])
+                rcon = OVERFLOW_BYTE
             end
             key_schedule[1:BYTESIZE,i] .⊻= rcon
             rcon <<= 1
@@ -66,21 +188,19 @@ function rotate_word(word::BitVector)
     circshift(word, -BYTESIZE)
 end
 
-function sub_words(words::BitArray)
-    @assert size(words, 1) == WORDSIZE
-    mapslices(sub_word, words, dims = 1)
-end
+sub_words(words::BitArray) = mapslices(sub_word, words, dims = 1)
+sub_words_inv(words::BitArray) = mapslices(sub_word_inv, words, dims = 1)
 
-function sub_word(word::BitVector)
-    @assert length(word) == WORDSIZE
-    mapslices(sub_byte, reshape(word, BYTESIZE, :), dims = 1)[:]
-end
+sub_word(word::BitVector) = mapslices(sub_byte, reshape(word, BYTESIZE, :), dims = 1)[:]
+sub_word_inv(word::BitVector) = mapslices(sub_byte_inv, reshape(word, BYTESIZE, :), dims = 1)[:]
 
-function sub_byte(byte::BitVector)
+sub_byte(byte::BitVector) = sub_byte(byte, SBOX)
+sub_byte_inv(byte::BitVector) = sub_byte(byte, SBOX_INV)
+function sub_byte(byte::BitVector, sbox::Array{UInt8})
     @assert length(byte) == BYTESIZE
     row = bitvector_to_int(byte[1:BYTESIZE÷2]) + 1
     column = bitvector_to_int(byte[BYTESIZE÷2+1:BYTESIZE]) + 1
-    int_to_bitvector(SBOX[column, row], BYTESIZE)
+    int_to_bitvector(sbox[row, column], BYTESIZE)
 end
 
 const SBOX = [
@@ -100,6 +220,39 @@ const SBOX = [
     0x70 0x3e 0xb5 0x66 0x48 0x03 0xf6 0x0e 0x61 0x35 0x57 0xb9 0x86 0xc1 0x1d 0x9e
     0xe1 0xf8 0x98 0x11 0x69 0xd9 0x8e 0x94 0x9b 0x1e 0x87 0xe9 0xce 0x55 0x28 0xdf
     0x8c 0xa1 0x89 0x0d 0xbf 0xe6 0x42 0x68 0x41 0x99 0x2d 0x0f 0xb0 0x54 0xbb 0x16
+]
+
+const SBOX_INV = [
+    0x52 0x09 0x6a 0xd5 0x30 0x36 0xa5 0x38 0xbf 0x40 0xa3 0x9e 0x81 0xf3 0xd7 0xfb
+    0x7c 0xe3 0x39 0x82 0x9b 0x2f 0xff 0x87 0x34 0x8e 0x43 0x44 0xc4 0xde 0xe9 0xcb
+    0x54 0x7b 0x94 0x32 0xa6 0xc2 0x23 0x3d 0xee 0x4c 0x95 0x0b 0x42 0xfa 0xc3 0x4e
+    0x08 0x2e 0xa1 0x66 0x28 0xd9 0x24 0xb2 0x76 0x5b 0xa2 0x49 0x6d 0x8b 0xd1 0x25
+    0x72 0xf8 0xf6 0x64 0x86 0x68 0x98 0x16 0xd4 0xa4 0x5c 0xcc 0x5d 0x65 0xb6 0x92
+    0x6c 0x70 0x48 0x50 0xfd 0xed 0xb9 0xda 0x5e 0x15 0x46 0x57 0xa7 0x8d 0x9d 0x84
+    0x90 0xd8 0xab 0x00 0x8c 0xbc 0xd3 0x0a 0xf7 0xe4 0x58 0x05 0xb8 0xb3 0x45 0x06
+    0xd0 0x2c 0x1e 0x8f 0xca 0x3f 0x0f 0x02 0xc1 0xaf 0xbd 0x03 0x01 0x13 0x8a 0x6b
+    0x3a 0x91 0x11 0x41 0x4f 0x67 0xdc 0xea 0x97 0xf2 0xcf 0xce 0xf0 0xb4 0xe6 0x73
+    0x96 0xac 0x74 0x22 0xe7 0xad 0x35 0x85 0xe2 0xf9 0x37 0xe8 0x1c 0x75 0xdf 0x6e
+    0x47 0xf1 0x1a 0x71 0x1d 0x29 0xc5 0x89 0x6f 0xb7 0x62 0x0e 0xaa 0x18 0xbe 0x1b
+    0xfc 0x56 0x3e 0x4b 0xc6 0xd2 0x79 0x20 0x9a 0xdb 0xc0 0xfe 0x78 0xcd 0x5a 0xf4
+    0x1f 0xdd 0xa8 0x33 0x88 0x07 0xc7 0x31 0xb1 0x12 0x10 0x59 0x27 0x80 0xec 0x5f
+    0x60 0x51 0x7f 0xa9 0x19 0xb5 0x4a 0x0d 0x2d 0xe5 0x7a 0x9f 0x93 0xc9 0x9c 0xef
+    0xa0 0xe0 0x3b 0x4d 0xae 0x2a 0xf5 0xb0 0xc8 0xeb 0xbb 0x3c 0x83 0x53 0x99 0x61
+    0x17 0x2b 0x04 0x7e 0xba 0x77 0xd6 0x26 0xe1 0x69 0x14 0x63 0x55 0x21 0x0c 0x7d
+]
+
+const MIX = [
+    0x02 0x01 0x01 0x03
+    0x03 0x02 0x01 0x01
+    0x01 0x03 0x02 0x01
+    0x01 0x01 0x03 0x02
+]
+
+const MIX_INV = [
+    0x0e 0x09 0x0d 0x0b
+    0x0b 0x0e 0x09 0x0d
+    0x0d 0x0b 0x0e 0x09
+    0x09 0x0d 0x0b 0x0e
 ]
 
 end

@@ -9,40 +9,45 @@ const KEYSIZE = 56
 
 function operate(input::String, iv::String, key::String, operation::Op, triplicate::Bool)
     inputvector = string_to_bitvector(input)
-    @assert length(inputvector) % BLOCKSIZE == 0
     ivvector = string_to_bitvector(iv)
-    @assert length(ivvector) == BLOCKSIZE
     keyvector = string_to_bitvector(key)
-    @assert length(keyvector) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
-    output = similar(inputvector)
-    for i in 1:BLOCKSIZE:length(inputvector)
-        inputblock = inputvector[i:i+BLOCKSIZE-1]
+    output = operate(inputvector, ivvector, keyvector, operation, triplicate)
+    bitvector_to_string(output)
+end
+
+function operate(input::BitVector, iv::BitVector, key::BitVector, operation::Op, triplicate::Bool)
+    @assert length(input) % BLOCKSIZE == 0
+    @assert length(iv) == BLOCKSIZE
+    @assert length(key) == (triplicate ? 3BLOCKSIZE : BLOCKSIZE)
+    output = similar(input)
+    for i in 1:BLOCKSIZE:length(input)
+        inputblock = input[i:i+BLOCKSIZE-1]
         if operation == encrypt
-            inputblock .⊻= ivvector
+            inputblock .⊻= iv
             if triplicate
-                outputblock = blockoperate(inputblock, keyvector[1:BLOCKSIZE], encrypt)
-                outputblock = blockoperate(outputblock, keyvector[BLOCKSIZE+1:2BLOCKSIZE], decrypt)
-                outputblock = blockoperate(outputblock, keyvector[2BLOCKSIZE+1:3BLOCKSIZE], encrypt)
+                outputblock = blockoperate(inputblock, key[1:BLOCKSIZE], encrypt)
+                outputblock = blockoperate(outputblock, key[BLOCKSIZE+1:2BLOCKSIZE], decrypt)
+                outputblock = blockoperate(outputblock, key[2BLOCKSIZE+1:3BLOCKSIZE], encrypt)
             else
-                outputblock = blockoperate(inputblock, keyvector, encrypt)
+                outputblock = blockoperate(inputblock, key, encrypt)
             end
-            ivvector = outputblock
+            iv = outputblock
             output[i:i+BLOCKSIZE-1] = outputblock
         end
         if operation == decrypt
             if triplicate
-                outputblock = blockoperate(inputblock, keyvector[2BLOCKSIZE+1:3BLOCKSIZE], decrypt)
-                outputblock = blockoperate(outputblock, keyvector[BLOCKSIZE+1:2BLOCKSIZE], encrypt)
-                outputblock = blockoperate(outputblock, keyvector[1:BLOCKSIZE], decrypt)
+                outputblock = blockoperate(inputblock, key[2BLOCKSIZE+1:3BLOCKSIZE], decrypt)
+                outputblock = blockoperate(outputblock, key[BLOCKSIZE+1:2BLOCKSIZE], encrypt)
+                outputblock = blockoperate(outputblock, key[1:BLOCKSIZE], decrypt)
             else
-                outputblock = blockoperate(inputblock, keyvector, decrypt)
+                outputblock = blockoperate(inputblock, key, decrypt)
             end
-            outputblock .⊻= ivvector
-            ivvector = inputblock
+            outputblock .⊻= iv
+            iv = inputblock
             output[i:i+BLOCKSIZE-1] = outputblock
         end
     end
-    bitvector_to_string(output)
+    return output
 end
 
 function blockoperate(plaintext::String, key::String, operation::Op)
