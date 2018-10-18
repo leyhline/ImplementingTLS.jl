@@ -62,7 +62,7 @@ function blockencrypt(input::String, key::String)
 end
 
 function blockencrypt(input::BitVector, key::BitVector)
-    state = reshape(input, WORDSIZE, 4)
+    state = copy(reshape(input, WORDSIZE, 4))
     nr_rounds = length(key) ÷ WORDSIZE + 6
     key_schedule = compute_key_schedule(key)
     state .⊻= key_schedule[:,1:4]
@@ -85,7 +85,7 @@ function blockdecrypt(input::String, key::String)
 end
 
 function blockdecrypt(input::BitVector, key::BitVector)
-    state = reshape(input, WORDSIZE, 4)
+    state = copy(reshape(input, WORDSIZE, 4))
     nr_rounds = length(key) ÷ WORDSIZE + 6
     key_schedule = compute_key_schedule(key)
     state .⊻= key_schedule[:,4nr_rounds+1:4nr_rounds+4]
