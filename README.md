@@ -1,3 +1,5 @@
+**Stalled for now since Julia tooling is still immature. Also, startup time and unit tests are taking too long.**
+
 # ImplementingTLS.jl
 Going through "Implementing SSL/TLS" by Joshua Davies
 
